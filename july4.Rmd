@@ -1,0 +1,135 @@
+---
+title: "Weight Tracker"
+author: "Kevin Ren"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(car)
+library("ggplot2")
+library(tidyverse)
+library(lubridate)
+library(forecast)
+weight <- read.csv("Downloads/weightjuly3.csv", header=TRUE, stringsAsFactors = FALSE)
+morning <- weight$waking.up
+night <- weight$at.night
+date <- as.Date(weight$date, "%m/%d")
+weight$index <- c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18)
+index <- weight$index
+```
+
+# Plotting Morning Weight
+
+```{r}
+plot(morning~date, type="b", ylab="Morning Weight",xlab="Date")
+title("The State of the Cut")
+```
+
+# Plotting Nighttime Weight
+
+```{r}
+plot(night~date, type="b", ylab="Nighttime Weight",xlab="Date")
+title("The State of the Cut")
+```
+
+
+# Linear Regression of Morning and Nighttime Weights With Respect to Time
+
+```{r}
+morning_lm <- lm(morning~index)
+summary(morning_lm)
+
+night_lm <- lm(night~index)
+summary(night_lm)
+```
+
+# Incorporating Both Plots and Regressions
+
+```{r}
+cool_double_plot <- ggplot(weight, aes(date, group="1")) +
+  geom_line(aes(y=waking.up, color="Waking Up")) +
+  geom_line(aes(y=at.night,color="Before Bed")) +
+  ggtitle("State of the Cut") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Date") + 
+  ylab("Weight") + 
+  geom_abline(slope = coef(night_lm)[["index"]], 
+              intercept = coef(night_lm)[["(Intercept)"]], color="dodgerblue1") +
+  geom_abline(slope = coef(morning_lm)[["index"]], 
+              intercept = coef(morning_lm)[["(Intercept)"]], color="lightsalmon2") +
+  scale_colour_manual(values = c("dodgerblue1", "lightsalmon2")) 
+cool_double_plot
+```
+
+# Forecasting
+
+## Linear Modeling
+
+Weight by August (according to linear regression):
+```{r}
+august_p <- as.data.frame(47)
+colnames(august_p) = "index"
+```
+
+Morning:
+```{r}
+predict(morning_lm, newdata=august_p)
+```
+
+"Nighttime:"
+```{r}
+predict(night_lm, newdata=august_p)
+```
+
+## Time Series Analysis
+
+```{r}
+weight.ts <- ts(cbind(morning, night),
+start = decimal_date(ymd("2022-06-15")),
+                    frequency = 365)
+plot(weight.ts, xlab ="Day",
+    main ="TS of Weight",
+    col.main ="darkgreen")
+```
+
+### Plotting TS Predictions using Arima Model
+
+```{r}
+morning_weight.ts <- ts(morning,
+start = decimal_date(ymd("2022-06-15")),
+                    frequency = 1)
+night_weight.ts <- ts(night,
+start = decimal_date(ymd("2022-06-15")),
+                    frequency = 1)
+morning.fit <- auto.arima(morning_weight.ts)
+night.fit <- auto.arima(night_weight.ts)
+```
+ 
+### Next 47 forecasted values (up to August 1)
+Morning:
+```{r}
+forecast(morning.fit, 47)
+```
+Night:
+```{r}
+forecast(night.fit, 47)
+```
+
+
+### Plotting the graph with forecasted values
+```{r}
+plot(forecast(morning.fit, 45), xlab ="Day",
+ylab ="Weight",
+main ="How Will the Cut Progress? Morning Edition", col.main ="darkgreen")
+
+plot(forecast(night.fit, 45), xlab ="Day",
+ylab ="Weight",
+main ="How Will the Cut Progress? Night Edition", col.main ="darkgreen")
+```
+
+
+
